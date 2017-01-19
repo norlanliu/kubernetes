@@ -34,41 +34,61 @@ source "${ROOT}/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 
 function check-vm-exist() {
     if nova show $1 >> /dev/null; then
-        return 1
-    else
         return 0
+    else
+        return 1
+    fi
+}
+
+function check-router-exist() {
+    if neutron router-show $1 >> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function check-subnet-exist() {
+    if neutron subnet-show $1 >> /dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function check-net-exist() {
+    if neutron net-show $1 >> /dev/null; then
+        return 0
+    else
+        return 1
     fi
 }
 function delete-instances() {
     if check-vm-exist ${MASTER_NAME}; then
+        echo "[INFO] delete "${MASTER_NAME}
         nova force-delete ${MASTER_NAME}
-        local ins_id
-        for i in `seq 1 ${NUMBER_OF_ROUTERS}`
-        do
-            for j in `seq 1 ${NUMBER_OF_NETWORKS}`
-            do
-                for k in `seq 1 ${NUMBER_OF_MINIONS_PER_NET}`
-                do
-                    ins_id=$(echo $i * $j + $k|bc)
-                    if check-vm-exist ${MINION_NAME_PREFIX}${ins_id}; then
-                        echo "[INFO] delete "${MINION_NAME_PREFIX}${ins_id}"..."
-                        nova force-delete ${MINION_NAME_PREFIX}${ins_id}
-                    fi
-                done
-            done
-        done
     fi
+    local num_of_instances=$(echo ${NUMBER_OF_ROUTERS}*${NUMBER_OF_NETWORKS}*${NUMBER_OF_MINIONS_PER_NET}|bc)
+    for i in `seq 1 ${num_of_instances}`
+    do
+        if check-vm-exist ${MINION_NAME_PREFIX}${i}; then
+            echo "[INFO] delete "${MINION_NAME_PREFIX}${i}"..."
+            nova force-delete ${MINION_NAME_PREFIX}${i}
+        fi
+    done
 }
 
 function delete-router() {
     for i in `seq 1 ${NUMBER_OF_ROUTERS}`
     do
-        for j in `seq 1 ${NUMBER_OF_NETWORKS}`
-        do
-            neutron router-interface-delete ${ROUTER_PREFIX}-${i} ${NETWORK_PREFIX}-${j}-${SUBNET_PREFIX}
-        done
-        neutron router-gateway-clear ${ROUTER_PREFIX}-${i}
-        neutron router-delete ${ROUTER_PREFIX}-${i}
+        if check-router-exist ${ROUTER_PREFIX}-${i}; then
+            for j in `seq 1 ${NUMBER_OF_NETWORKS}`
+            do
+                neutron router-interface-delete ${ROUTER_PREFIX}-${i} ${NETWORK_PREFIX}-${j}-${SUBNET_PREFIX}
+            done
+            neutron router-gateway-clear ${ROUTER_PREFIX}-${i}
+            neutron router-delete ${ROUTER_PREFIX}-${i}
+        fi
     done
 }
 
@@ -76,8 +96,12 @@ function delete-networks() {
     echo '[INFO] delete ${NUMBER_OF_NETWORKS} network'
     for i in `seq 1 ${NUMBER_OF_NETWORKS}`
     do
-	    neutron subnet-delete ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX}
-        neutron net-delete ${NETWORK_PREFIX}-${i}
+        if check-subnet-exist ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX}; then
+            neutron subnet-delete ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX}
+        fi
+        if check-net-exist ${NETWORK_PREFIX}-${i}; then
+            neutron net-delete ${NETWORK_PREFIX}-${i}
+        fi
     done
 }
 
