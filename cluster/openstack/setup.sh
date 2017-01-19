@@ -54,8 +54,8 @@ function create-network() {
     for i in `seq 1 ${NUMBER_OF_NETWORKS}`
     do
         neutron net-create ${NETWORK_PREFIX}-${i}
-        cidr=$(sed 's/@/${i}/g' <<< ${SUBNET_CIDR_TEMPLATE})
-	    neutron subnet-create --name ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX} --ip-version 4 --dns-nameserver 114.114.114.114 --dns-nameserver 8.8.8.8  ${NETWORK_PREFIX}-${i} ${cidr}
+        cidr=$(sed 's/@/'${i}'/g' <<< ${SUBNET_CIDR_TEMPLATE})
+	neutron subnet-create --name ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX} --ip-version 4 --dns-nameserver 114.114.114.114 --dns-nameserver 8.8.8.8  ${NETWORK_PREFIX}-${i} ${cidr}
     done
 }
 
@@ -73,14 +73,41 @@ function create-router() {
     done
 }
 
+function check-flavor() {
+    if nova flavor-show $1 > /dev/null 2>&1;then
+        return 1
+    else
+        return 0
+    fi
+}
+
+# create flaovor
+function create-flavor() {
+    echo '[INFO] Create flavors ...'
+    if check-flavor ${MINION_FLAVOR};then
+        nova flavor-create ${MINION_FLAVOR} auto ${MINION_FLAVOR_CONF_RAM} ${MINION_FLAVOR_CONF_DISK} ${MINION_FLAVOR_CONF_VCPUS}
+    fi
+    if check-flavor ${MASTER_FLAVOR};then
+        nova flavor-create ${MASTER_FLAVOR} auto ${MASTER_FLAVOR_CONF_RAM} ${MASTER_FLAVOR_CONF_DISK} ${MASTER_FLAVOR_CONF_VCPUS}
+    fi
+}
+
 # Create instances
 function create-instances() {
     echo '[INFO] Create instances...'
     local num_of_instances=$(echo ${NUMBER_OF_ROUTERS}*${NUMBER_OF_NETWORKS}*${NUMBER_OF_MINIONS_PER_NET}|bc)
-    for i in `seq 1 ${num_of_instances}`
+    local minion_id=1
+    for i in `seq 1 ${NUMBER_OF_ROUTERS}`
     do
-        echo "Create" ${MINION_NAME_PREFIX}${i}"..."
-        nova boot --flavor ${MINION_FLAVOR} --image ${IMAGE_ID} --key-name LQ-FEDORA --security-group default --nic net-name=${NETWORK_PREFIX}-${j} ${MINION_NAME_PREFIX}${i}
+        for j in `seq 1 ${NUMBER_OF_NETWORKS}`
+        do
+	    for k in `seq 1 ${NUMBER_OF_MINIONS_PER_NET}`
+            do
+		echo "Create "${MINION_NAME_PREFIX}${minion_id}"..."
+		nova boot --flavor ${MINION_FLAVOR} --image ${IMAGE_ID} --key-name LQ-FEDORA --security-group default --nic net-name=${NETWORK_PREFIX}-${j} ${MINION_NAME_PREFIX}${minion_id}
+                minion_id=$(( $minion_id + 1 ))
+            done
+        done
     done
 }
 
@@ -88,7 +115,7 @@ function create-instances() {
 function create-master() {
     echo '[INFO] Create master'
     nova boot --flavor ${MASTER_FLAVOR} --image ${IMAGE_ID} --key-name LQ-FEDORA --security-group default --nic net-name=${NETWORK_PREFIX}-1 ${MASTER_NAME}
-    floatingip=$(neutron floatingip-create ${EXTERNAL_NETWORK}| tr -d '[:space:]' | awk -F'|' '$2=="floating_ip_address"{print $3}')
+    floatingip=$(neutron floatingip-create ${EXTERNAL_NETWORK}| grep 'floating_ip_address' | tr -d '[:space:]' | awk -F'|' '$2=="floating_ip_address"{print $3}')
     nova floating-ip-associate ${MASTER_NAME} ${floatingip}
     echo "Master ip: ${floatingip}" 1>&2
 }
@@ -100,9 +127,9 @@ function vm-up() {
 
     create-network
 
-    create-subnet
-
     create-router
+
+    create-flavor
 
     create-instances
 

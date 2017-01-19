@@ -33,7 +33,7 @@ readonly ROOT=$(dirname "${BASH_SOURCE}")
 source "${ROOT}/${KUBE_CONFIG_FILE:-"config-default.sh"}"
 
 function check-vm-exist() {
-    if nova show $1 >> /dev/null; then
+    if nova show $1 > /dev/null 2>&1; then
         return 0
     else
         return 1
@@ -41,7 +41,7 @@ function check-vm-exist() {
 }
 
 function check-router-exist() {
-    if neutron router-show $1 >> /dev/null; then
+    if neutron router-show $1 > /dev/null 2>&1; then
         return 0
     else
         return 1
@@ -49,7 +49,7 @@ function check-router-exist() {
 }
 
 function check-subnet-exist() {
-    if neutron subnet-show $1 >> /dev/null; then
+    if neutron subnet-show $1 > /dev/null 2>&1; then
         return 0
     else
         return 1
@@ -57,13 +57,24 @@ function check-subnet-exist() {
 }
 
 function check-net-exist() {
-    if neutron net-show $1 >> /dev/null; then
+    if neutron net-show $1 > /dev/null 2>&1; then
         return 0
     else
         return 1
     fi
 }
+
+function delete-flavor() {
+    echo '[INFO] delete flavor...'
+    if nova flavor-show ${MINION_FLAVOR} > /dev/null 2>&1;then
+        nova flavor-delete ${MINION_FLAVOR}
+    fi
+    if nova flavor-show ${MASTER_FLAVOR} > /dev/null 2>&1;then
+        nova flavor-delete ${MASTER_FLAVOR}
+    fi
+}
 function delete-instances() {
+    echo '[INFO] delete instances...'
     if check-vm-exist ${MASTER_NAME}; then
         echo "[INFO] delete "${MASTER_NAME}
         nova force-delete ${MASTER_NAME}
@@ -79,6 +90,7 @@ function delete-instances() {
 }
 
 function delete-router() {
+    echo '[INFO] delete routers...'
     for i in `seq 1 ${NUMBER_OF_ROUTERS}`
     do
         if check-router-exist ${ROUTER_PREFIX}-${i}; then
@@ -93,7 +105,7 @@ function delete-router() {
 }
 
 function delete-networks() {
-    echo '[INFO] delete ${NUMBER_OF_NETWORKS} network'
+    echo '[INFO] delete networks...'
     for i in `seq 1 ${NUMBER_OF_NETWORKS}`
     do
         if check-subnet-exist ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX}; then
@@ -112,7 +124,11 @@ function vm-down() {
 
     delete-router
 
+    delete-flavor
+
     delete-networks
+    
+    echo 'done'
 }
 
 vm-down

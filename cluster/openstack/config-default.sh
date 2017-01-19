@@ -35,7 +35,7 @@ SUBNET_PREFIX=${SUBNET_PREFIX:-sub}
 
 SUBNET_CIDR_TEMPLATE=${SUBNET_CIDR_TEMPLATE:-192.168.@.0/24}
 
-SUBNET_PREFIX=${NETWORK_PREFIX:-kube-subnet}
+SUBNET_PREFIX=${SUBNET_PREFIX:-subnet}
 
 NUMBER_OF_MINIONS_PER_NET=${NUMBER_OF_MINIONS_PER_NET:-2}
 
@@ -51,18 +51,13 @@ MASTER_NAME=${MASTER_NAME:-kubemaster}
 
 EXTERNAL_NETWORK=${EXTERNAL_NETWORK:-ext-net}
 
-# Flag indicates if new image must be created. If 'false' then image with IMAGE_ID will be used.
-# If 'true' then new image will be created from file config-image.sh
-CREATE_IMAGE=${CREATE_IMAGE:-true} # use "true" for devstack
-
-# Flag indicates if image should be downloaded
-DOWNLOAD_IMAGE=${DOWNLOAD_IMAGE:-true}
-
 # Image id which will be used for kubernetes stack
-IMAGE_ID=${IMAGE_ID:-f0f394b1-5546-4b68-b2bc-8abe8a7e6b8b}
+IMAGE_ID=${IMAGE_ID:-46baa7bf-f1eb-4f81-9b22-7126408bd8bd}
 
-# DNS server address
-DNS_SERVER=${DNS_SERVER:-8.8.8.8}
+MINION_FLAVOR_CONF_RAM=${MINION_FLAVOR_CONFIG:-4096}
+MINION_FLAVOR_CONF_DISK=${MINION_FLAVOR_CONFIG:-20}
+MINION_FLAVOR_CONF_VCPUS=${MINION_FLAVOR_CONFIG:-4}
 
-# Public RSA key path
-CLIENT_PUBLIC_KEY_PATH=${CLIENT_PUBLIC_KEY_PATH:-~/.ssh/id_rsa.pub}
+MASTER_FLAVOR_CONF_RAM=${MINION_FLAVOR_CONFIG:-8192}
+MASTER_FLAVOR_CONF_DISK=${MINION_FLAVOR_CONFIG:-40}
+MASTER_FLAVOR_CONF_VCPUS=${MINION_FLAVOR_CONFIG:-6}
