@@ -54,13 +54,9 @@ function create-network() {
     for i in `seq 1 ${NUMBER_OF_NETWORKS}`
     do
         neutron net-create ${NETWORK_PREFIX}-${i}
-        cidr=`sed 's/@/${i}/g' <<< ${SUBNET_CIDR_TEMPLATE}`
+        cidr=$(sed 's/@/${i}/g' <<< ${SUBNET_CIDR_TEMPLATE})
 	    neutron subnet-create --name ${NETWORK_PREFIX}-${i}-${SUBNET_PREFIX} --ip-version 4 --dns-nameserver 114.114.114.114 --dns-nameserver 8.8.8.8  ${NETWORK_PREFIX}-${i} ${cidr}
     done
-}
-# create networks
-function create-subnet() {
-    echo '[INFO] Create subnets'
 }
 
 # Create router
@@ -79,19 +75,12 @@ function create-router() {
 
 # Create instances
 function create-instances() {
-    echo '[INFO] Create instances'
-    local ins_id
-    for i in `seq 1 ${NUMBER_OF_ROUTERS}`
+    echo '[INFO] Create instances...'
+    local num_of_instances=$(echo ${NUMBER_OF_ROUTERS}*${NUMBER_OF_NETWORKS}*${NUMBER_OF_MINIONS_PER_NET}|bc)
+    for i in `seq 1 ${num_of_instances}`
     do
-        for j in `seq 1 ${NUMBER_OF_NETWORKS}`
-        do
-            for k in `seq 1 ${NUMBER_OF_MINIONS_PER_NET}`
-            do
-                ins_id=$(echo $i * $j + $k|bc)
-                echo "Create" ${MINION_NAME_PREFIX}${ins_id}"..."
-                nova boot --flavor ${MINION_FLAVOR} --image ${IMAGE_ID} --key-name LQ-FEDORA --security-group default --nic net-name=${NETWORK_PREFIX}-${j} ${MINION_NAME_PREFIX}${ins_id}
-            done
-        done
+        echo "Create" ${MINION_NAME_PREFIX}${i}"..."
+        nova boot --flavor ${MINION_FLAVOR} --image ${IMAGE_ID} --key-name LQ-FEDORA --security-group default --nic net-name=${NETWORK_PREFIX}-${j} ${MINION_NAME_PREFIX}${i}
     done
 }
 
