@@ -20,20 +20,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/v1"
+	autoscaling_v1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
+	batch_v1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/runtime/schema"
 )
 
 var securePort = 6443 + 2
@@ -42,15 +44,23 @@ var serverIP = fmt.Sprintf("http://localhost:%v", insecurePort)
 var groupVersions = []schema.GroupVersion{
 	fed_v1b1.SchemeGroupVersion,
 	ext_v1b1.SchemeGroupVersion,
+	batch_v1.SchemeGroupVersion,
+	autoscaling_v1.SchemeGroupVersion,
 }
 
 func TestRun(t *testing.T) {
+	certDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		t.Fatalf("Failed to create temporary certificate directory: %v", err)
+	}
+	defer os.RemoveAll(certDir)
+
 	s := options.NewServerRunOptions()
 	s.SecureServing.ServingOptions.BindPort = securePort
 	s.InsecureServing.BindPort = insecurePort
-	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
-	s.GenericServerRunOptions.ServiceClusterIPRange = *ipNet
 	s.Etcd.StorageConfig.ServerList = []string{"http://localhost:2379"}
+	s.SecureServing.ServerCert.CertDirectory = certDir
+
 	go func() {
 		if err := app.Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
@@ -205,6 +215,8 @@ func testAPIResourceList(t *testing.T) {
 	testFederationResourceList(t)
 	testCoreResourceList(t)
 	testExtensionsResourceList(t)
+	testBatchResourceList(t)
+	testAutoscalingResourceList(t)
 }
 
 func testFederationResourceList(t *testing.T) {
@@ -337,4 +349,56 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "deployments/rollback")
+}
+
+func testBatchResourceList(t *testing.T) {
+	serverURL := serverIP + "/apis/" + batch_v1.SchemeGroupVersion.String()
+	contents, err := readResponse(serverURL)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var apiResourceList metav1.APIResourceList
+	err = json.Unmarshal(contents, &apiResourceList)
+	if err != nil {
+		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
+	}
+	// empty APIVersion for extensions group
+	assert.Equal(t, "v1", apiResourceList.APIVersion)
+	assert.Equal(t, batch_v1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
+	// Assert that there are exactly this number of resources.
+	assert.Equal(t, 2, len(apiResourceList.APIResources))
+
+	// Verify jobs
+	found := findResource(apiResourceList.APIResources, "jobs")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "jobs/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+}
+
+func testAutoscalingResourceList(t *testing.T) {
+	serverURL := serverIP + "/apis/" + autoscaling_v1.SchemeGroupVersion.String()
+	contents, err := readResponse(serverURL)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	var apiResourceList metav1.APIResourceList
+	err = json.Unmarshal(contents, &apiResourceList)
+	if err != nil {
+		t.Fatalf("Error in unmarshalling response from server %s: %v", serverURL, err)
+	}
+	// empty APIVersion for extensions group
+	assert.Equal(t, "v1", apiResourceList.APIVersion)
+	assert.Equal(t, autoscaling_v1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
+	// Assert that there are exactly this number of resources.
+	assert.Equal(t, 2, len(apiResourceList.APIResources))
+
+	// Verify hpa
+	found := findResource(apiResourceList.APIResources, "horizontalpodautoscalers")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "horizontalpodautoscalers/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
 }

@@ -35,7 +35,7 @@ DOCKER_DOWNLOAD_URL=\
 "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
 
 FLANNEL_DOWNLOAD_URL=\
-"https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-${FLANNEL_VERSION}-linux-amd64.tar.gz"
+"https://github.com/coreos/flannel/releases/download/v${FLANNEL_VERSION}/flannel-v${FLANNEL_VERSION}-linux-amd64.tar.gz"
 
 ETCD_DOWNLOAD_URL=\
 "https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz"

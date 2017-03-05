@@ -21,11 +21,24 @@ limitations under the License.
 package app
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
-	"k8s.io/kubernetes/pkg/runtime/schema"
+	"k8s.io/kubernetes/pkg/controller/job"
 )
+
+func startJobController(ctx ControllerContext) (bool, error) {
+	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}] {
+		return false, nil
+	}
+	go job.NewJobController(
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Batch().V1().Jobs(),
+		ctx.ClientBuilder.ClientOrDie("job-controller"),
+	).Run(int(ctx.Options.ConcurrentJobSyncs), ctx.Stop)
+	return true, nil
+}
 
 func startCronJobController(ctx ControllerContext) (bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}] {

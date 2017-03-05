@@ -24,11 +24,11 @@ import (
 
 	"github.com/spf13/pflag"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilflag "k8s.io/apiserver/pkg/util/flag"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
-	"k8s.io/kubernetes/pkg/util/config"
 )
 
 type ControllerManagerConfiguration struct {
@@ -69,7 +69,7 @@ type ControllerManagerConfiguration struct {
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// ConfigurationMap determining which controllers should be enabled or disabled
-	Controllers config.ConfigurationMap `json:"controllers"`
+	Controllers utilflag.ConfigurationMap `json:"controllers"`
 }
 
 // CMServer is the main context object for the controller manager.
@@ -97,7 +97,7 @@ func NewCMServer() *CMServer {
 			APIServerQPS:              20.0,
 			APIServerBurst:            30,
 			LeaderElection:            leaderelection.DefaultLeaderElectionConfiguration(),
-			Controllers:               make(config.ConfigurationMap),
+			Controllers:               make(utilflag.ConfigurationMap),
 		},
 	}
 	return &s
@@ -123,8 +123,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DnsProvider, "dns-provider", s.DnsProvider, "DNS provider. Valid values are: "+fmt.Sprintf("%q", dnsprovider.RegisteredDnsProviders()))
 	fs.StringVar(&s.DnsConfigFile, "dns-provider-config", s.DnsConfigFile, "Path to config file for configuring DNS provider.")
 	fs.Var(&s.Controllers, "controllers", ""+
-		"A set of key=value pairs that describe controller configuration that may be passed "+
-		"to controller manager to enable/disable specific controllers. Valid options are: \n"+
-		"ingress=true|false (default=true)")
+		"A set of key=value pairs that describe controller configuration "+
+		"to enable/disable specific controllers. Key should be the resource name (like services) and value should be true or false. "+
+		"For example: services=false,ingresses=false")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
 }
